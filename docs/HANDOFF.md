@@ -17,7 +17,11 @@
 - [ ] Maps & Modesと各LevelのGameModeの確認
 - [ ] PIE / Standaloneでの一周確認
 - [ ] Windowsパッケージでの一周確認
-- [ ] GitHubリポジトリ作成とpush
+- [x] GitHubリポジトリ作成とpush
+
+公開先: https://github.com/mrtksHub/codex_ue_sample （Public）
+
+公開時の検証: 初回コミットの `git diff --cached --check` が成功し、`main` の初回pushが成功。UEでの起動、PIE、Standalone、パッケージングの検証は未実施。
 
 UEアセットは未作成です。エディターを用意しただけでこのひな形が動作するわけではありません。
 

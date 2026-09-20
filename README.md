@@ -1,7 +1,7 @@
 # codex_ue_sample
 
 Unreal Engine 5.8 / Blueprintのみで実装する、4画面の遷移サンプル。
-公開予定先: https://github.com/mrtksHub/codex_ue_sample
+公開先: https://github.com/mrtksHub/codex_ue_sample
 
 ## 現在の状態
 
