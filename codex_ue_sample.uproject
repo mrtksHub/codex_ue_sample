@@ -1,0 +1,6 @@
+{
+  "FileVersion": 3,
+  "EngineAssociation": "5.8",
+  "Category": "Samples",
+  "Description": "Blueprint-only four-level screen flow sample. Content assets must be created in Unreal Editor."
+}
