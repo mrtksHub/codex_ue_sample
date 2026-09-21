@@ -197,3 +197,24 @@ ObjectToolsで各CDOの`defaultPawnClass`と`playerControllerClass`を確認し�
 Config確認結果: EditorStartupMap/GameDefaultMapはL_Opening、GlobalDefaultGameModeはBP_GameModeBase、GameInstanceClassはBP_GameInstance。DefaultGame.iniのMapsToCookには4 Levelが既に含まれている。DefaultEngine.iniの既存Android File Server設定と認証値を含む差分は今回のコミット対象外とした。.codexとDefaultInput.iniも対象外。
 
 Output Logの今回のGameMode Compile記録にErrorはない。過去のController配線エラー記録は履歴として残るが、GameMode関連ではない。PIEはまだ開始していない。
+
+### Standalone動作確認結果 (2026-09-21)
+
+人間によるStandalone Game確認を完了した。`L_Opening`から起動し、Opening -> MainTitle -> Game -> Ending -> Openingの一周と、Openingへ戻った後の再度MainTitle遷移を確認した。各画面のマウスカーソルとInput Modeは意図どおりに動作し、PIEで発生していたNon-Focusable widget警告は修正済みである。
+
+LogsToolsetでStandalone実行に対応するLogPlayLevel、LogWorld、LogUMG、LogGameMode、LogInit、LogOutputDeviceを確認した。今回のStandalone実行時刻帯（04:32台）に新規Error/Warningはなかった。過去のController配線エラーは履歴として残っているが、修正済みで今回の実行由来ではない。LogSlateの既存ショートカット重複Warningも今回のゲーム動作由来ではない。
+
+Standalone確認後の未コミット差分は、Controller 3件のWidget To Focus修正、DefaultEngine.iniのEditor再生成差分、DefaultInput.ini/.codex、そしてこの記録である。GameMode本体と4 LevelのWorld Settings変更は前回コミット済みである。
+
+### 最終動作確認結果 (2026-09-21)
+
+人間による最終確認を完了した。
+
+- PIE: Opening -> MainTitle -> Game -> Ending -> Opening の一周に成功し、Openingへ戻った後の再度MainTitle遷移も成功。
+- Standalone: 同じ画面遷移一周に成功。
+- Windows Packaging: 生成に成功し、パッケージ版でも同じ画面遷移一周に成功。
+- Packaging設定: Architectureは明示的なx64ではなく`Project Default`を使用した。
+- UIフォーカス: UIOnly画面のフォーカス対象Widgetを正しく設定し、Non-Focusable widget警告を修正した。
+- Quitボタン: 今回の最小サンプルのスコープ外として未実装。
+
+GameMode本体と4 LevelのWorld Settingsは既存コミットで管理されている。今回のコミットではControllerのWidget To Focus修正と本検証記録を対象にする。DefaultEngine.iniのAndroid File Serverおよび認証情報を含む環境依存差分、uprojectのMCPプラグイン差分、.codex、DefaultInput.ini、Build/その他生成物はコミット対象外とする。
