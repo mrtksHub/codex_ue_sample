@@ -61,3 +61,10 @@ Confirm Dialog表示中のEscはCancelとして扱い、1回のEsc入力で複�
 - ローカル環境依存設定や認証情報はGitへ含めない
 
 詳細なBlueprint構成と現在の仕様は [docs/BLUEPRINT_SPEC.md](docs/BLUEPRINT_SPEC.md) を参照してください。
+
+
+## License
+
+This project is licensed under the [MIT License](LICENSE).
+
+Unreal Engine and any Epic Games-provided content or third-party assets are subject to their respective license terms.
