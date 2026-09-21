@@ -1,132 +1,370 @@
 # Blueprint実装仕様
 
-この文書は未実装の設計です。各項目をUE 5.8で作成して検証します。
+この文書は、`codex_ue_sample` の現在の実装仕様を示します。
 
-## 必須アセット
+## 概要
 
-| パス（Contentからの相対パス） | 種類 / 親クラス |
+- Unreal Engine 5.8
+- Blueprintのみで実装
+- 4つのLevelを順番に遷移する最小サンプル
+- ゲーム用Pawnは使用しないUI中心の構成
+- Level Blueprintには画面遷移ロジックを持たせない
+
+画面遷移は次のループです。
+
+```text
+L_Opening
+  ↓ Any Key
+L_MainTitle
+  ↓ Start
+L_Game
+  ↓ Game Clear
+L_Ending
+  ↓ Finish
+L_Opening
+```
+
+Quit機能は実装していません。EndingのFinishはアプリ終了ではなくOpeningへ戻ります。
+
+## Level
+
+| Level | 役割 |
 | --- | --- |
-| Maps/L_Opening | Level |
-| Maps/L_MainTitle | Level |
-| Maps/L_Game | Level |
-| Maps/L_Ending | Level |
-| Blueprints/Core/BP_GameInstance | GameInstance |
-| Blueprints/Core/BP_GameModeBase | GameModeBase |
-| Blueprints/Opening/BP_OpeningController | PlayerController |
-| Blueprints/MainTitle/BP_TitleController | PlayerController |
-| Blueprints/Game/BP_GameController | PlayerController |
-| Blueprints/Ending/BP_EndingController | PlayerController |
-| UI/Opening/WBP_Opening | UserWidget |
-| UI/MainTitle/WBP_MainTitle | UserWidget |
-| UI/Game/WBP_GameHUD | UserWidget |
-| UI/Ending/WBP_Ending | UserWidget |
+| `/Game/Maps/L_Opening` | 起動画面。任意のキー入力でMainTitleへ進む |
+| `/Game/Maps/L_MainTitle` | Startボタンを表示するタイトル画面 |
+| `/Game/Maps/L_Game` | 仮のゲーム画面。Game Clearボタンを表示 |
+| `/Game/Maps/L_Ending` | Ending表示とFinishボタンを表示 |
 
-型の定義用に `Blueprints/Core/Types/` を追加し、以下を作成します。
+4 Levelとも画面固有のPlayerControllerをGameMode経由で使用します。
 
-| 型 | 初期の定義 |
-| --- | --- |
-| E_ScreenState | Opening, MainTitle, Game, Ending |
-| ST_PlayerData | PlayerName: String（空）、PlayerLevel: Integer（1） |
-| ST_Settings | MasterVolume: Float（1.0）、BGMVolume: Float（1.0）、SEVolume: Float（1.0） |
-| ST_SaveData | SaveVersion: Integer（1）、SavedChapter: Integer（0）、HasSave: Boolean（false） |
+## 共通型
+
+`/Game/Blueprints/Core/Types/` に以下の型を定義しています。
+
+### E_ScreenState
+
+- Opening
+- MainTitle
+- Game
+- Ending
+
+### ST_PlayerData
+
+| メンバー | 型 | 初期値 |
+| --- | --- | --- |
+| PlayerName | String | 空文字 |
+| PlayerLevel | Integer | 1 |
+
+### ST_Settings
+
+| メンバー | 型 | 初期値 |
+| --- | --- | --- |
+| MasterVolume | Float | 1.0 |
+| BGMVolume | Float | 1.0 |
+| SEVolume | Float | 1.0 |
+
+### ST_SaveData
+
+| メンバー | 型 | 初期値 |
+| --- | --- | --- |
+| SaveVersion | Integer | 1 |
+| SavedChapter | Integer | 0 |
+| HasSave | Boolean | false |
+
+`ST_SaveData` は将来拡張用のメモリー上のデータ構造です。ファイルへの永続保存処理は現在実装していません。
 
 ## BP_GameInstance
 
-変数:
+アセット:
+
+`/Game/Blueprints/Core/BP_GameInstance`
+
+親クラス:
+
+`GameInstance`
+
+Levelをまたいで保持する共通状態と、画面遷移の入口を担当します。
+
+### 変数
 
 | 名前 | 型 | 初期値 |
 | --- | --- | --- |
 | GameState | E_ScreenState | Opening |
 | CurrentChapter | Integer | 0 |
-| PlayerData | ST_PlayerData | 上記の構造体初期値 |
-| Settings | ST_Settings | 上記の構造体初期値 |
-| SaveData | ST_SaveData | 上記の構造体初期値 |
+| PlayerData | ST_PlayerData | 構造体初期値 |
+| Settings | ST_Settings | 構造体初期値 |
+| SaveData | ST_SaveData | 構造体初期値 |
 | bTransitionInProgress | Boolean | false |
 
-`GameState` はこのサンプル独自の画面状態です。UEのGameStateクラスとは別です。
-SaveDataは将来用のメモリー上のデータであり、ディスク保存は実装しません。
+`GameState` はこのサンプル独自の画面状態であり、Unreal EngineのGameStateクラスとは別です。
 
-関数 `GoToScreen(Target: E_ScreenState)`:
+### NotifyScreenReady
 
-1. bTransitionInProgressがtrueならreturn。
-2. trueにする。
-3. TargetでSwitchし、対応Levelを `Open Level (by Object Reference)` で開く。
-4. 4つのLevelの参照を明示的に設定する。文字列によるパスの組み立ては不要。
+```text
+NotifyScreenReady(Screen)
+  ↓
+GameState = Screen
+  ↓
+bTransitionInProgress = false
+```
 
-関数 `NotifyScreenReady(Screen: E_ScreenState)`:
+各PlayerControllerのBeginPlayから呼び出します。
 
-1. GameStateをScreenにする。
-2. bTransitionInProgressをfalseにする。
+Level遷移後に `bTransitionInProgress` を解除し、現在のLevelと `GameState` を同期します。
 
-各ControllerのBeginPlayからNotifyScreenReadyを呼びます。
-これにより各Levelを直接PIE起動した場合も画面状態が一致します。
-LevelをまたいでもGameInstanceは同じインスタンスなので、共通データをBeginPlayで初期化し直しません。
+### GoToScreen
 
-## GameModeとControllerの選択
+```text
+GoToScreen(Target)
+  ↓
+bTransitionInProgress ?
+  ├─ true  → 何もしない
+  └─ false
+       ↓
+     bTransitionInProgress = true
+       ↓
+     Switch on E_ScreenState
+       ├─ Opening   → L_Opening
+       ├─ MainTitle → L_MainTitle
+       ├─ Game      → L_Game
+       └─ Ending    → L_Ending
+```
 
-BP_GameModeBaseのDefault Pawn ClassはNoneにします。
-`Get Player Controller Class to Spawn` をOverrideし、`Get Current Level Name`
-（Remove Prefix String=true）の結果で以下のController Classを返します。
-UE 5.8のエディターでOverrideと返り値の型を確認して実装してください。
+Level遷移には `Open Level (by Object Reference)` を使用します。
 
-| Level名 | Controller Class |
+`bTransitionInProgress` により、連打などによる重複した画面遷移を防ぎます。
+
+## GameMode構成
+
+共通GameMode:
+
+`/Game/Blueprints/Core/BP_GameModeBase`
+
+- 親クラス: `GameModeBase`
+- Default Pawn Class: `None`
+
+画面ごとに子GameModeを用意し、それぞれ異なるPlayerControllerを使用します。
+
+| Level | GameMode | PlayerController |
+| --- | --- | --- |
+| L_Opening | BP_OpeningGameMode | BP_OpeningController |
+| L_MainTitle | BP_MainTitleGameMode | BP_TitleController |
+| L_Game | BP_GameGameMode | BP_GameController |
+| L_Ending | BP_EndingGameMode | BP_EndingController |
+
+アセットパス:
+
+- `/Game/Blueprints/Opening/BP_OpeningGameMode`
+- `/Game/Blueprints/MainTitle/BP_MainTitleGameMode`
+- `/Game/Blueprints/Game/BP_GameGameMode`
+- `/Game/Blueprints/Ending/BP_EndingGameMode`
+
+各LevelのWorld Settingsに対応するGameMode Overrideを設定しています。
+
+単一GameMode内でLevel名を判定してControllerを切り替える方式は使用していません。
+
+## PlayerController
+
+### BP_OpeningController
+
+アセット:
+
+`/Game/Blueprints/Opening/BP_OpeningController`
+
+BeginPlay:
+
+```text
+Get Game Instance
+  ↓
+Cast To BP_GameInstance
+  ↓
+NotifyScreenReady(Opening)
+  ↓
+Create Widget(WBP_Opening)
+  ↓
+Add to Viewport
+  ↓
+Set Input Mode Game Only
+  ↓
+Show Mouse Cursor = false
+```
+
+入力:
+
+```text
+Any Key Pressed
+  ↓
+Get Game Instance
+  ↓
+Cast To BP_GameInstance
+  ↓
+GoToScreen(MainTitle)
+```
+
+### BP_TitleController
+
+アセット:
+
+`/Game/Blueprints/MainTitle/BP_TitleController`
+
+- `NotifyScreenReady(MainTitle)`
+- `WBP_MainTitle` を生成してViewportへ追加
+- Set Input Mode UI Only
+- Show Mouse Cursor = true
+- Widget To Focus = `Btn_Start`
+- `Btn_Start` にSet User Focus
+
+### BP_GameController
+
+アセット:
+
+`/Game/Blueprints/Game/BP_GameController`
+
+- `NotifyScreenReady(Game)`
+- `WBP_GameHUD` を生成してViewportへ追加
+- Set Input Mode UI Only
+- Show Mouse Cursor = true
+- Widget To Focus = `Btn_GameClear`
+- `Btn_GameClear` にSet User Focus
+
+### BP_EndingController
+
+アセット:
+
+`/Game/Blueprints/Ending/BP_EndingController`
+
+- `NotifyScreenReady(Ending)`
+- `WBP_Ending` を生成してViewportへ追加
+- Set Input Mode UI Only
+- Show Mouse Cursor = true
+- Widget To Focus = `Btn_Finish`
+- `Btn_Finish` にSet User Focus
+
+UI Only画面では、画面全体のUserWidgetではなくフォーカス可能なButtonを `Widget To Focus` に指定します。
+
+## Widget
+
+### WBP_Opening
+
+アセット:
+
+`/Game/UI/Opening/WBP_Opening`
+
+表示:
+
+- `CODEX UE SAMPLE`
+- `Press Any Key`
+
+画面遷移処理はWidget側には持たず、`BP_OpeningController` のAny Key入力で処理します。
+
+### WBP_MainTitle
+
+アセット:
+
+`/Game/UI/MainTitle/WBP_MainTitle`
+
+- `Btn_Start`
+- 表示文字: `Start`
+- Is Focusable = true
+
+```text
+Btn_Start.OnClicked
+  ↓
+Get Game Instance
+  ↓
+Cast To BP_GameInstance
+  ↓
+GoToScreen(Game)
+```
+
+### WBP_GameHUD
+
+アセット:
+
+`/Game/UI/Game/WBP_GameHUD`
+
+- 仮の色付き背景
+- `Btn_GameClear`
+- 表示文字: `Game Clear`
+- Is Focusable = true
+
+```text
+Btn_GameClear.OnClicked
+  ↓
+Get Game Instance
+  ↓
+Cast To BP_GameInstance
+  ↓
+GoToScreen(Ending)
+```
+
+### WBP_Ending
+
+アセット:
+
+`/Game/UI/Ending/WBP_Ending`
+
+- `Ending` テキスト
+- `Btn_Finish`
+- 表示文字: `Finish`
+- Is Focusable = true
+
+```text
+Btn_Finish.OnClicked
+  ↓
+Get Game Instance
+  ↓
+Cast To BP_GameInstance
+  ↓
+GoToScreen(Opening)
+```
+
+## Project Settings
+
+現在の基本設定は次のとおりです。
+
+| 項目 | 設定 |
 | --- | --- |
-| L_Opening | BP_OpeningController |
-| L_MainTitle | BP_TitleController |
-| L_Game | BP_GameController |
-| L_Ending | BP_EndingController |
+| Editor Startup Map | `L_Opening` |
+| Game Default Map | `L_Opening` |
+| Default GameMode | `BP_GameModeBase` |
+| Game Instance Class | `BP_GameInstance` |
 
-未一致時はBP_OpeningControllerを返し、開発時の警告を出します。
-各LevelのWorld Settingsは共通BP_GameModeBaseを使用します。
-Level Blueprintには遷移処理を書きません。
+PackagingのMapsToCookには以下4 Levelを含めています。
 
-## UIと入力
+- `/Game/Maps/L_Opening`
+- `/Game/Maps/L_MainTitle`
+- `/Game/Maps/L_Game`
+- `/Game/Maps/L_Ending`
 
-各ControllerのBeginPlay:
+各LevelではProject SettingsのDefault GameModeよりもWorld SettingsのGameMode Overrideが優先され、対応する画面用GameModeが使用されます。
 
-1. Get Game Instance → Cast to BP_GameInstance → NotifyScreenReadyで対応状態を通知。
-2. Create Widget（対応WBP、Owning Player=self）→ Add to Viewport。
-3. 入力モードとフォーカスを設定する。
+## 動作確認済み範囲
 
-Opening:
+以下を確認済みです。
 
-- WBP_Openingは仮ロゴ「CODEX UE SAMPLE」と「Press Any Key」を中央表示。
-- Set Input Mode Game Only。カーソルは非表示。
-- BP_OpeningControllerのAny KeyのPressed → GoToScreen(MainTitle)。
-- マウス移動では遷移しない。キー押下・マウスボタン・ゲームパッドボタンを実機で確認する。
-- PIEでは入力取得にビューポートのクリックが必要な場合があるため、Standaloneでも確認する。
+- PIEで Opening → MainTitle → Game → Ending → Opening を一周
+- Openingへ戻った後、再度MainTitleへ遷移可能
+- Standalone Gameで同じ画面遷移を確認
+- Windowsパッケージ生成成功
+- Windowsパッケージ版で同じ画面遷移を確認
+- UI Only画面のフォーカス設定によるNon-Focusable widget警告を解消
 
-その他の画面:
+Windows PackagingではArchitectureに明示的なx64指定をせず、`Project Default` を使用した構成で動作確認しています。
 
-- Set Input Mode UI Only、Show Mouse Cursor=true。
-- Widgetを表示後、対応ボタンへSet User Focus。ボタンのIs Focusable=true。
-- WidgetのOnClicked → Get Game Instance → Cast → GoToScreen(次の画面)。
-- MainTitle: Start → Game。
-- Game: 色付き背景（UMG Border等）とGame Clear → Ending。
-- Ending: EndingテキストとFinish → Opening。
-- マウスとキーボードによるボタン操作を確認する。
-- データ更新や遷移先のパス解決はWidget内へ分散させない。
+## 現在のスコープ外
 
-## Levelと設定
+以下は現在実装していません。
 
-Empty Levelを4つ作成し、指定パスで保存します。今回はUMGの仮背景でよく、ゲーム用のPawnは不要です。
-すべてのBlueprintをCompile / Saveした後、Project Settingsで以下を確認します。
+- Quitボタン / Quit Game
+- セーブデータのファイル永続化
+- Settings画面
+- 実ゲームロジック
+- Pawn / Character
+- 戦闘
+- グリッド
+- ユニット
+- カメラ制御
+- 本番用アート / オーディオ
 
-- Maps & Modes / Editor Startup Map: L_Opening
-- Maps & Modes / Game Default Map: L_Opening
-- Maps & Modes / Default GameMode: BP_GameModeBase
-- Maps & Modes / Game Instance Class: BP_GameInstance
-- Packaging / List of maps to include: 4つすべて
-
-Configには上記の完成時のパスを先に設定済みです。実アセット作成後に一致を確認してください。
-
-### GameMode設計更新 (2026-09-21)
-
-UE 5.8のBlueprintで確実に利用できる方式として、単一のBP_GameModeBaseから「Get Player Controller Class to Spawn」をOverrideして切り替える設計は採用しない。共通の`/Game/Blueprints/Core/BP_GameModeBase`（親GameModeBase、Default Pawn Class=None）と、Levelごとの子GameModeを使用する。
-
-- `BP_OpeningGameMode` -> `BP_OpeningController`
-- `BP_MainTitleGameMode` -> `BP_TitleController`
-- `BP_GameGameMode` -> `BP_GameController`
-- `BP_EndingGameMode` -> `BP_EndingController`
-
-各LevelのWorld SettingsのGameMode Overrideに対応する子GameModeを設定する。Level Blueprintは空のままにする。Project SettingsのEditor Startup Map/Game Default Mapは`L_Opening`、Game Instance Classは`BP_GameInstance`、Default GameModeは`BP_GameModeBase`とする。PackagingのMapsToCookには4 Levelを含める。
+このプロジェクトは、UE 5.8のBlueprintでLevel、GameMode、PlayerController、UMG Widget、GameInstanceを組み合わせた画面遷移構成を確認するための最小サンプルです。
