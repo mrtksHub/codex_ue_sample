@@ -119,3 +119,14 @@ Empty Levelを4つ作成し、指定パスで保存します。今回はUMGの�
 - Packaging / List of maps to include: 4つすべて
 
 Configには上記の完成時のパスを先に設定済みです。実アセット作成後に一致を確認してください。
+
+### GameMode設計更新 (2026-09-21)
+
+UE 5.8のBlueprintで確実に利用できる方式として、単一のBP_GameModeBaseから「Get Player Controller Class to Spawn」をOverrideして切り替える設計は採用しない。共通の`/Game/Blueprints/Core/BP_GameModeBase`（親GameModeBase、Default Pawn Class=None）と、Levelごとの子GameModeを使用する。
+
+- `BP_OpeningGameMode` -> `BP_OpeningController`
+- `BP_MainTitleGameMode` -> `BP_TitleController`
+- `BP_GameGameMode` -> `BP_GameController`
+- `BP_EndingGameMode` -> `BP_EndingController`
+
+各LevelのWorld SettingsのGameMode Overrideに対応する子GameModeを設定する。Level Blueprintは空のままにする。Project SettingsのEditor Startup Map/Game Default Mapは`L_Opening`、Game Instance Classは`BP_GameInstance`、Default GameModeは`BP_GameModeBase`とする。PackagingのMapsToCookには4 Levelを含める。

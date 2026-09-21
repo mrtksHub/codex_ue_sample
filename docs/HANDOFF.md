@@ -180,3 +180,20 @@ Enum/Structの作成とLevel新規作成は、現行MCPの専用Toolだけでは
 - BlueprintTools node discovery exposes GameModeBase PlayerControllerClass get/set-related class data but no `Get Player Controller Class to Spawn` Blueprint node or override entry. Epic's UE 5.8 AGameModeBase API documents PlayerControllerClass and C++ spawn/virtual functions, but the requested per-level override is not exposed through the available BlueprintTools node catalog.
 - Recommended Blueprint-only design: create per-level GameMode child Blueprints (or equivalent Editor-created overrides) with PlayerControllerClass set to BP_OpeningController, BP_TitleController, BP_GameController, and BP_EndingController, then assign each in the corresponding Level World Settings GameMode Override. If the project must retain one BP_GameModeBase only, human Editor verification of an override hook is required before proceeding.
 - Required World Settings: assign the appropriate GameMode Override for each Level and keep Level Blueprints empty. Required Project Settings: Game Default Map and Editor Startup Map L_Opening, Game Instance Class BP_GameInstance, and Default GameMode reference to the selected base/default GameMode. Packaging should include all four maps.
+
+### GameMode実装結果 (2026-09-21)
+
+Widget + Controllerフェーズは`631e670`（`Implement UI screens and controllers`）として`origin/feat/ue58-mcp-implementation`へpush済み。以後のGameMode変更はこの時点では未コミット。
+
+作成・Compile・Save済み:
+- `/Game/Blueprints/Core/BP_GameModeBase`（GameModeBase、Default Pawn Class=None）
+- `/Game/Blueprints/Opening/BP_OpeningGameMode` -> `BP_OpeningController`
+- `/Game/Blueprints/MainTitle/BP_MainTitleGameMode` -> `BP_TitleController`
+- `/Game/Blueprints/Game/BP_GameGameMode` -> `BP_GameController`
+- `/Game/Blueprints/Ending/BP_EndingGameMode` -> `BP_EndingController`
+
+ObjectToolsで各CDOの`defaultPawnClass`と`playerControllerClass`を確認した。SceneToolsで各Levelを順にロードし、WorldSettingsの`defaultGameMode`をObjectToolsで設定・再読込し、AssetToolsで保存した。設定結果はL_Opening->BP_OpeningGameMode、L_MainTitle->BP_MainTitleGameMode、L_Game->BP_GameGameMode、L_Ending->BP_EndingGameMode。
+
+Config確認結果: EditorStartupMap/GameDefaultMapはL_Opening、GlobalDefaultGameModeはBP_GameModeBase、GameInstanceClassはBP_GameInstance。DefaultGame.iniのMapsToCookには4 Levelが既に含まれている。DefaultEngine.iniの既存Android File Server設定と認証値を含む差分は今回のコミット対象外とした。.codexとDefaultInput.iniも対象外。
+
+Output Logの今回のGameMode Compile記録にErrorはない。過去のController配線エラー記録は履歴として残るが、GameMode関連ではない。PIEはまだ開始していない。
